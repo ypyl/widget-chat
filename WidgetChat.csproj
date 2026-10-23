@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>WidgetChat</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Secrets stay outside the repo: dotnet user-secrets set "Llm:ApiKey" "..." -->
+    <UserSecretsId>widgetchat-4f3a1c9e-8b2d-4a57-9e61-7c0d5b8a2f14</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Microsoft.Agents.AI brings Microsoft.Extensions.AI (IChatClient) transitively.
+         Microsoft.Agents.AI.OpenAI supplies the OpenAI-compatible client adapter. -->
+    <PackageReference Include="Microsoft.Agents.AI" Version="1.26.0" />
+    <PackageReference Include="Microsoft.Agents.AI.OpenAI" Version="1.26.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The endpoint is internal so the tests can drive it without a test host. -->
+    <InternalsVisibleTo Include="WidgetChat.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The Web SDK globs every .cs under the project directory; keep the test project out of it. -->
+    <Compile Remove="tests/**" />
+    <Content Remove="tests/**" />
+    <None Remove="tests/**" />
+    <EmbeddedResource Remove="tests/**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Reference widgets: the offline stub's replies, and worked examples of the wire format. -->
+    <EmbeddedResource Include="Samples/*.txt" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,157 @@
+Here is a bar chart of illustrative weekly signups. The slider scales the series, and the toggle dims every bar except the peak.
+
+@@HEIGHT:390@@
+@@CSS@@
+.card { border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; background: var(--surface); }
+.head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.head h2 { margin: 0; font-size: 14px; }
+.head span { font-size: 12px; color: var(--muted); }
+.chart { display: block; width: 100%; height: 200px; }
+.grid { stroke: var(--border); stroke-width: 1; }
+.axis { fill: var(--muted); font-size: 10px; font-family: var(--font-sans); }
+.value { fill: var(--fg); font-size: 10px; font-family: var(--font-mono); }
+.bar { fill: var(--accent); }
+.bar.dim { fill: var(--surface-2); stroke: var(--border); }
+.row { display: flex; align-items: center; gap: 10px; margin-top: 10px; font-size: 13px; }
+.row label { color: var(--muted); }
+.row output { font-family: var(--font-mono); font-size: 12px; min-width: 44px; text-align: right; }
+.foot { margin: 10px 0 0; font-size: 11px; color: var(--muted); }
+@@HTML@@
+<div class="card">
+  <div class="head">
+    <h2>Weekly signups</h2>
+    <span>sample data</span>
+  </div>
+  <svg class="chart" viewBox="0 0 360 200" role="img" aria-labelledby="chartTitle chartDesc">
+    <title id="chartTitle">Bar chart of weekly signups</title>
+    <desc id="chartDesc">Seven bars, Monday to Sunday, peaking on Thursday.</desc>
+    <g id="grid"></g>
+    <g id="bars"></g>
+    <g id="labels"></g>
+  </svg>
+  <div class="row">
+    <label for="scale">Scale</label>
+    <input id="scale" type="range" min="0.5" max="2" step="0.1" value="1" />
+    <output id="scalev" for="scale">1.0&times;</output>
+  </div>
+  <div class="row">
+    <button type="button" id="peak" aria-pressed="false">Highlight peak</button>
+  </div>
+  <p class="foot" id="summary">Peak is Thursday with 38 signups. Values are illustrative, not live data.</p>
+</div>
+@@JS@@
+var chartState = null;
+
+function drawChart(multiplier, highlightPeak) {
+  var series = [
+    { label: 'Mon', value: 21 },
+    { label: 'Tue', value: 27 },
+    { label: 'Wed', value: 24 },
+    { label: 'Thu', value: 38 },
+    { label: 'Fri', value: 33 },
+    { label: 'Sat', value: 14 },
+    { label: 'Sun', value: 11 }
+  ];
+
+  var values = series.map(function (item) { return item.value * multiplier; });
+  var max = Math.max.apply(null, values.concat([1]));
+  var peakIndex = values.indexOf(Math.max.apply(null, values));
+
+  var left = 26;
+  var top = 12;
+  var width = 360 - left - 10;
+  var height = 160;
+  var slot = width / series.length;
+  var barWidth = Math.min(28, slot * 0.62);
+
+  var barsHost = document.getElementById('bars');
+  var labelHost = document.getElementById('labels');
+  var gridHost = document.getElementById('grid');
+  barsHost.textContent = '';
+  labelHost.textContent = '';
+  gridHost.textContent = '';
+
+  var svgNs = 'http://www.w3.org/2000/svg';
+
+  [0, 0.5, 1].forEach(function (fraction) {
+    var line = document.createElementNS(svgNs, 'line');
+    var y = top + height - height * fraction;
+    line.setAttribute('x1', String(left - 6));
+    line.setAttribute('x2', String(360 - 8));
+    line.setAttribute('y1', String(y));
+    line.setAttribute('y2', String(y));
+    line.setAttribute('class', 'grid');
+    gridHost.appendChild(line);
+
+    var tick = document.createElementNS(svgNs, 'text');
+    tick.setAttribute('x', String(left - 10));
+    tick.setAttribute('y', String(y + 3));
+    tick.setAttribute('text-anchor', 'end');
+    tick.setAttribute('class', 'axis');
+    tick.textContent = String(Math.round(max * fraction));
+    gridHost.appendChild(tick);
+  });
+
+  series.forEach(function (item, index) {
+    var barHeight = Math.max(2, (values[index] / max) * height);
+    var x = left + slot * index + (slot - barWidth) / 2;
+
+    var rect = document.createElementNS(svgNs, 'rect');
+    rect.setAttribute('x', String(x));
+    rect.setAttribute('y', String(top + height - barHeight));
+    rect.setAttribute('width', String(barWidth));
+    rect.setAttribute('height', String(barHeight));
+    rect.setAttribute('rx', '3');
+    rect.setAttribute('class', highlightPeak && index !== peakIndex ? 'bar dim' : 'bar');
+    barsHost.appendChild(rect);
+
+    var valueText = document.createElementNS(svgNs, 'text');
+    valueText.setAttribute('x', String(x + barWidth / 2));
+    valueText.setAttribute('y', String(top + height - barHeight - 4));
+    valueText.setAttribute('text-anchor', 'middle');
+    valueText.setAttribute('class', 'value');
+    valueText.textContent = String(Math.round(values[index]));
+    barsHost.appendChild(valueText);
+
+    var name = document.createElementNS(svgNs, 'text');
+    name.setAttribute('x', String(x + barWidth / 2));
+    name.setAttribute('y', String(top + height + 14));
+    name.setAttribute('text-anchor', 'middle');
+    name.setAttribute('class', 'axis');
+    name.textContent = item.label;
+    labelHost.appendChild(name);
+  });
+
+  document.getElementById('summary').textContent =
+    'Peak is ' + series[peakIndex].label + ' with ' + Math.round(values[peakIndex]) +
+    ' signups at a ' + multiplier.toFixed(1) + ' times scale. Values are illustrative, not live data.';
+}
+
+function setupChart() {
+  var slider = document.getElementById('scale');
+  var output = document.getElementById('scalev');
+  var peakButton = document.getElementById('peak');
+  var highlightPeak = false;
+
+  function refresh() {
+    var multiplier = slider.valueAsNumber;
+    if (!Number.isFinite(multiplier) || multiplier < 0.5 || multiplier > 2) {
+      multiplier = 1;
+    }
+    output.textContent = multiplier.toFixed(1) + '\u00d7';
+    drawChart(multiplier, highlightPeak);
+  }
+
+  slider.addEventListener('input', refresh);
+  peakButton.addEventListener('click', function () {
+    highlightPeak = !highlightPeak;
+    peakButton.setAttribute('aria-pressed', highlightPeak ? 'true' : 'false');
+    refresh();
+  });
+
+  chartState = { refresh: refresh };
+  refresh();
+}
+
+setupChart();
+@@END@@

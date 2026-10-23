@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Widget Chat</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body>
+  <header class="topbar">
+    <div class="bar">
+      <strong>Widget Chat</strong>
+      <span class="badge" id="badge" title="Active model">…</span>
+    </div>
+  </header>
+
+  <main id="messages" class="messages">
+    <section class="intro">
+      <h1>Ask a question. Get prose, a diagram, or a 3D scene.</h1>
+      <p>
+        The reply streams into a sandboxed iframe. Widget code is generated per message, so the
+        surface is open-ended: SVG, HTML, charts, or Three.js.
+      </p>
+      <div class="chips">
+        <button type="button" class="chip">Explain pitch, roll and yaw with a rotatable 3D cube</button>
+        <button type="button" class="chip">Show weekly signups as an SVG bar chart</button>
+        <button type="button" class="chip">What is a sandboxed iframe in one sentence?</button>
+      </div>
+    </section>
+  </main>
+
+  <form id="composer" class="composer">
+    <div class="bar">
+      <textarea id="input" rows="1" placeholder="Ask something…" autocomplete="off"></textarea>
+      <button type="button" id="stop" hidden>Stop</button>
+      <button type="submit" id="send">Send</button>
+    </div>
+  </form>
+
+  <script src="widget-host.js"></script>
+  <script src="app.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,166 @@
+Here is a cube you can rotate on each axis. The sliders set the angle, and the camera orbits with a drag.
+
+@@HEIGHT:470@@
+@@CSS@@
+.stage { position: relative; height: 300px; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--surface); }
+.stage canvas { display: block; width: 100%; height: 100%; }
+.controls { display: grid; gap: 8px; margin-top: 12px; }
+.row { display: grid; grid-template-columns: 64px 1fr 48px; align-items: center; gap: 10px; font-size: 13px; }
+.row label { color: var(--muted); }
+.row output { font-family: var(--font-mono); font-size: 12px; text-align: right; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; }
+.hint { margin: 8px 0 0; font-size: 12px; color: var(--muted); }
+#error { display: none; margin: 10px 0 0; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); font-size: 12px; }
+@@HTML@@
+<div class="stage" id="stage">
+  <canvas id="scene" aria-label="A cube rotated by three angle sliders"></canvas>
+</div>
+<div class="controls">
+  <div class="row">
+    <label for="ax">Pitch X</label>
+    <input id="ax" type="range" min="-180" max="180" step="1" value="-22" />
+    <output id="axv" for="ax">-22&deg;</output>
+  </div>
+  <div class="row">
+    <label for="ay">Yaw Y</label>
+    <input id="ay" type="range" min="-180" max="180" step="1" value="-38" />
+    <output id="ayv" for="ay">-38&deg;</output>
+  </div>
+  <div class="row">
+    <label for="az">Roll Z</label>
+    <input id="az" type="range" min="-180" max="180" step="1" value="0" />
+    <output id="azv" for="az">0&deg;</output>
+  </div>
+  <div class="actions">
+    <button type="button" id="demo">Demonstrate all three</button>
+    <button type="button" id="reset">Reset</button>
+  </div>
+</div>
+<p class="hint">Drag the scene to orbit the camera. Rotation is applied in X, then Y, then Z order.</p>
+<p id="error" role="status"></p>
+@@JS@@
+// The stage owns the renderer, lights, resizing, the single animation loop and teardown, so this
+// file only has to describe the cube and wire the controls.
+function cubeShowError(error) {
+  var el = document.getElementById('error');
+  var message = error && error.message ? error.message : String(error);
+  if (el) {
+    el.style.display = 'block';
+    el.textContent = 'The 3D view could not start: ' + message + ' Your browser may not support WebGL.';
+  }
+  if (window.host && window.host.report) {
+    window.host.report('error', (error && error.stack) || message);
+  }
+}
+
+async function setupCube() {
+  var THREE = await import('three');
+  var OrbitControls = (await import('three/examples/jsm/controls/OrbitControls.js')).OrbitControls;
+
+  function token(name, fallback) {
+    var value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    return value || fallback;
+  }
+
+  var stage = window.stage.mount({
+    THREE: THREE,
+    OrbitControls: OrbitControls,
+    canvas: document.getElementById('scene')
+  });
+
+  var geometry = new THREE.BoxGeometry(2, 2, 2);
+  var material = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(token('--accent', '#4f6bff')),
+    roughness: 0.34,
+    metalness: 0.06
+  });
+  var cube = stage.add(new THREE.Mesh(geometry, material));
+
+  // Edge colour comes from the theme, so the outline reads on light and dark backgrounds alike.
+  var edgeGeometry = new THREE.EdgesGeometry(geometry);
+  var edgeMaterial = new THREE.LineBasicMaterial({
+    color: new THREE.Color(token('--fg', '#15171c')),
+    transparent: true,
+    opacity: 0.24
+  });
+  cube.add(new THREE.LineSegments(edgeGeometry, edgeMaterial));
+
+  var axes = {
+    x: { input: document.getElementById('ax'), output: document.getElementById('axv'), angle: -22 },
+    y: { input: document.getElementById('ay'), output: document.getElementById('ayv'), angle: -38 },
+    z: { input: document.getElementById('az'), output: document.getElementById('azv'), angle: 0 }
+  };
+  var defaults = { x: -22, y: -38, z: 0 };
+  var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var demo = null;
+
+  function renderAngles() {
+    ['x', 'y', 'z'].forEach(function (axis) {
+      var item = axes[axis];
+      item.output.textContent = Math.round(item.angle) + '\u00b0';
+      item.input.value = String(Math.round(item.angle));
+    });
+    cube.rotation.set(
+      THREE.MathUtils.degToRad(axes.x.angle),
+      THREE.MathUtils.degToRad(axes.y.angle),
+      THREE.MathUtils.degToRad(axes.z.angle)
+    );
+  }
+
+  ['x', 'y', 'z'].forEach(function (axis) {
+    axes[axis].input.addEventListener('input', function () {
+      var value = axes[axis].input.valueAsNumber;
+      if (!Number.isFinite(value)) return;
+      demo = null;
+      axes[axis].angle = Math.max(-180, Math.min(180, value));
+      renderAngles();
+    });
+  });
+
+  document.getElementById('demo').addEventListener('click', function () {
+    if (reduceMotion) {
+      axes.x.angle = -60;
+      axes.y.angle = 140;
+      axes.z.angle = 75;
+      renderAngles();
+      return;
+    }
+    demo = {
+      startedAt: performance.now(),
+      from: { x: axes.x.angle, y: axes.y.angle, z: axes.z.angle },
+      to: { x: -60, y: 140, z: 75 }
+    };
+  });
+
+  document.getElementById('reset').addEventListener('click', function () {
+    demo = null;
+    axes.x.angle = defaults.x;
+    axes.y.angle = defaults.y;
+    axes.z.angle = defaults.z;
+    renderAngles();
+  });
+
+  // One tween, driven by the stage's loop. No second animation loop.
+  stage.onFrame(function (now) {
+    if (!demo) return;
+    var progress = Math.min(1, (now - demo.startedAt) / 1500);
+    var eased = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+    axes.x.angle = demo.from.x + (demo.to.x - demo.from.x) * eased;
+    axes.y.angle = demo.from.y + (demo.to.y - demo.from.y) * eased;
+    axes.z.angle = demo.from.z + (demo.to.z - demo.from.z) * eased;
+    renderAngles();
+    if (progress >= 1) demo = null;
+  });
+
+  stage.onDispose(function () {
+    geometry.dispose();
+    material.dispose();
+    edgeGeometry.dispose();
+    edgeMaterial.dispose();
+  });
+
+  renderAngles();
+}
+
+setupCube().catch(cubeShowError);
+@@END@@
